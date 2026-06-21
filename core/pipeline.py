@@ -1,36 +1,57 @@
 import os
-import json
 import re
+import json
 
 INPUT = "input_extracted"
 OUTPUT = "output_mod"
 
 
 # =========================
-# AI TRANSLATOR (SIMULASI)
+# TRANSLATOR (SIMULASI / GANTI AI)
 # =========================
 def ai_translate(text):
-    # NANTI BISA DIGANTI OPENAI API
-    return "ID: " + text
+    # nanti bisa diganti OpenAI
+    return translate_id(text)
 
 
 # =========================
-# SAFE TRANSLATE (CK3 PROTECTION)
+# SIMPLE INDONESIAN TRANSLATION
+# =========================
+def translate_id(text):
+    replacements = {
+        "died": "meninggal",
+        "from": "dari",
+        "of": "karena",
+        "War": "Perang",
+        "Castle": "Benteng",
+        "Temple": "Kuil",
+        "City": "Kota",
+        "port": "pelabuhan",
+        "ship": "kapal",
+        "repair": "memperbaiki"
+    }
+
+    result = text
+    for k, v in replacements.items():
+        result = re.sub(rf"\b{k}\b", v, result, flags=re.IGNORECASE)
+
+    return result
+
+
+# =========================
+# SAFE CK3 PROTECTION
 # =========================
 def safe_translate(text):
-    # ambil semua CK3 script seperti [GetTrait(...)]
-    protected = re.findall(r"\[.*?\]", text)
+    # protect CK3 variables $...$
+    protected = re.findall(r"\$.*?\$", text)
 
     temp = text
 
-    # ganti jadi placeholder
     for i, p in enumerate(protected):
         temp = temp.replace(p, f"__VAR{i}__")
 
-    # translate teks biasa
     translated = ai_translate(temp)
 
-    # restore CK3 script
     for i, p in enumerate(protected):
         translated = translated.replace(f"__VAR{i}__", p)
 
@@ -38,22 +59,25 @@ def safe_translate(text):
 
 
 # =========================
-# LOAD & SAVE JSON
+# CLEAN CK3 VALUE
 # =========================
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def clean_value(value):
+    value = value.strip()
 
+    # remove CK3 numeric prefix (:0 :1 :2)
+    value = re.sub(r"^[0-9]+\s+", "", value)
 
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    # remove quotes
+    if value.startswith('"') and value.endswith('"'):
+        value = value[1:-1]
+
+    return value
 
 
 # =========================
-# PROCESS FILE (MIRROR MODE)
+# PROCESS FILE
 # =========================
-def process_file(in_path, out_path, memory, glossary):
+def process_file(in_path, out_path):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     with open(in_path, "r", encoding="utf-8") as f:
@@ -62,37 +86,37 @@ def process_file(in_path, out_path, memory, glossary):
     new_lines = []
 
     for line in lines:
-        original_line = line
 
-        if ":" in line:
-            try:
-                key, value = line.split(":", 1)
+        # skip empty / invalid
+        if ":" not in line:
+            new_lines.append(line)
+            continue
 
-                text = value.strip().strip('"')
+        try:
+            key, value = line.split(":", 1)
 
-                # skip empty
-                if not text:
-                    new_lines.append(line)
-                    continue
+            raw = clean_value(value)
 
-                # glossary check
-                if text in glossary:
-                    translated = glossary[text]
+            # =========================
+            # SKIP CK3 VARIABLE TOTAL
+            # =========================
+            if raw.startswith("$") and raw.endswith("$"):
+                new_lines.append(line)
+                continue
 
-                # memory check
-                elif text in memory:
-                    translated = memory[text]
+            # skip empty
+            if not raw:
+                new_lines.append(line)
+                continue
 
-                # AI translate
-                else:
-                    translated = safe_translate(text)
-                    memory[text] = translated
+            # translate
+            translated = safe_translate(raw)
 
-                # replace value
-                line = f"{key}: \"{translated}\"\n"
+            # rebuild CK3 format (KEEP KEY + INDEX)
+            line = f'{key}: "{translated}"\n'
 
-            except:
-                pass
+        except:
+            pass
 
         new_lines.append(line)
 
@@ -101,31 +125,23 @@ def process_file(in_path, out_path, memory, glossary):
 
 
 # =========================
-# MAIN PIPELINE
+# MAIN RUNNER
 # =========================
 def run():
-    print("🚀 START TRANSLATION PIPELINE")
+    print("🚀 CK3 TRANSLATOR START (FIXED VERSION)")
 
-    memory = load_json("memory/translation_memory.json")
-    glossary = load_json("memory/glossary.json")
-
-    total_files = 0
+    total = 0
 
     for root, _, files in os.walk(INPUT):
         for f in files:
             if f.endswith(".yml"):
                 in_path = os.path.join(root, f)
-
-                # mirror path ke output_mod
                 out_path = in_path.replace(INPUT, OUTPUT)
 
-                process_file(in_path, out_path, memory, glossary)
+                process_file(in_path, out_path)
+                total += 1
 
-                total_files += 1
-
-    save_json("memory/translation_memory.json", memory)
-
-    print(f"✅ DONE - {total_files} FILES TRANSLATED")
+    print(f"✅ DONE - {total} FILES")
 
 
 if __name__ == "__main__":
