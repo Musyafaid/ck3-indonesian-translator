@@ -1,4 +1,9 @@
 import json
+import re
+
+def protect_ck3(text):
+    # ambil semua [ ... ] supaya tidak diubah
+    return re.findall(r"\[.*?\]", text)
 
 def ai(text):
     return "ID: " + text
