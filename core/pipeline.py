@@ -48,19 +48,21 @@ def translate_basic_id(text):
 # =========================
 def safe_translate(text):
 
-    # PROTECT:
-    # $variable$
-    # [chancellor|E]
-    # [Function()]
-    protected = re.findall(r"\$.*?\$|\[.*?\]", text)
+    # =========================
+    # PROTECT ALL CK3 SYSTEMS
+    # =========================
+    protected = re.findall(
+        r"\$.*?\$|\[.*?\]|#.*?#|@.*?!",
+        text
+    )
 
     temp = text
 
-    # replace semua CK3 system dengan placeholder
+    # replace dengan placeholder
     for i, p in enumerate(protected):
         temp = temp.replace(p, f"__VAR{i}__")
 
-    # translate only human text
+    # translate ONLY HUMAN TEXT
     translated = ai_translate(temp)
 
     # restore CK3 system
