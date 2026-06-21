@@ -1,0 +1,3 @@
+Translate CK3 text into Indonesian medieval style.
+Do not break variables like [ROOT.GetName], $VALUE$.
+Keep consistency of terms like King, Duke, Realm.
