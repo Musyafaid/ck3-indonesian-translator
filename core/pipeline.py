@@ -1,37 +1,42 @@
 import os
 import re
-import json
 
 INPUT = "input_extracted"
 OUTPUT = "output_mod"
 
 
 # =========================
-# TRANSLATOR (SIMULASI / GANTI AI)
+# AI TRANSLATOR (SIMULASI)
 # =========================
 def ai_translate(text):
-    # nanti bisa diganti OpenAI
-    return translate_id(text)
+    """
+    GANTI INI NANTI DENGAN OPENAI / AI MODEL
+    """
+    return translate_basic_id(text)
 
 
 # =========================
-# SIMPLE INDONESIAN TRANSLATION
+# TRANSLATION BASIC INDONESIA
 # =========================
-def translate_id(text):
+def translate_basic_id(text):
     replacements = {
+        "You have no": "Kamu tidak memiliki",
+        "has no": "tidak memiliki",
         "died": "meninggal",
         "from": "dari",
         "of": "karena",
-        "War": "Perang",
         "Castle": "Benteng",
         "Temple": "Kuil",
         "City": "Kota",
-        "port": "pelabuhan",
+        "Hall": "Aula",
+        "Grand": "Megah",
         "ship": "kapal",
-        "repair": "memperbaiki"
+        "port": "pelabuhan",
+        "docks": "dermaga"
     }
 
     result = text
+
     for k, v in replacements.items():
         result = re.sub(rf"\b{k}\b", v, result, flags=re.IGNORECASE)
 
@@ -39,19 +44,26 @@ def translate_id(text):
 
 
 # =========================
-# SAFE CK3 PROTECTION
+# SAFE CK3 PROTECTOR
 # =========================
 def safe_translate(text):
-    # protect CK3 variables $...$
-    protected = re.findall(r"\$.*?\$", text)
+
+    # PROTECT:
+    # $variable$
+    # [chancellor|E]
+    # [Function()]
+    protected = re.findall(r"\$.*?\$|\[.*?\]", text)
 
     temp = text
 
+    # replace semua CK3 system dengan placeholder
     for i, p in enumerate(protected):
         temp = temp.replace(p, f"__VAR{i}__")
 
+    # translate only human text
     translated = ai_translate(temp)
 
+    # restore CK3 system
     for i, p in enumerate(protected):
         translated = translated.replace(f"__VAR{i}__", p)
 
@@ -59,12 +71,12 @@ def safe_translate(text):
 
 
 # =========================
-# CLEAN CK3 VALUE
+# CLEAN VALUE (CK3 FORMAT FIX)
 # =========================
 def clean_value(value):
     value = value.strip()
 
-    # remove CK3 numeric prefix (:0 :1 :2)
+    # remove CK3 index :0 :1 :2
     value = re.sub(r"^[0-9]+\s+", "", value)
 
     # remove quotes
@@ -78,6 +90,7 @@ def clean_value(value):
 # PROCESS FILE
 # =========================
 def process_file(in_path, out_path):
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     with open(in_path, "r", encoding="utf-8") as f:
@@ -87,7 +100,6 @@ def process_file(in_path, out_path):
 
     for line in lines:
 
-        # skip empty / invalid
         if ":" not in line:
             new_lines.append(line)
             continue
@@ -97,22 +109,20 @@ def process_file(in_path, out_path):
 
             raw = clean_value(value)
 
-            # =========================
-            # SKIP CK3 VARIABLE TOTAL
-            # =========================
-            if raw.startswith("$") and raw.endswith("$"):
-                new_lines.append(line)
-                continue
-
-            # skip empty
+            # SKIP EMPTY
             if not raw:
                 new_lines.append(line)
                 continue
 
-            # translate
+            # SKIP PURE VARIABLE $...$
+            if raw.startswith("$") and raw.endswith("$"):
+                new_lines.append(line)
+                continue
+
+            # TRANSLATE
             translated = safe_translate(raw)
 
-            # rebuild CK3 format (KEEP KEY + INDEX)
+            # REBUILD CK3 LINE
             line = f'{key}: "{translated}"\n'
 
         except:
@@ -128,20 +138,21 @@ def process_file(in_path, out_path):
 # MAIN RUNNER
 # =========================
 def run():
-    print("🚀 CK3 TRANSLATOR START (FIXED VERSION)")
+
+    print("🚀 CK3 TRANSLATOR START (FINAL FIXED)")
 
     total = 0
 
     for root, _, files in os.walk(INPUT):
         for f in files:
-            if f.endswith(".yml"):
+            if f.endswith(".yml") or f.endswith(".txt"):
                 in_path = os.path.join(root, f)
                 out_path = in_path.replace(INPUT, OUTPUT)
 
                 process_file(in_path, out_path)
                 total += 1
 
-    print(f"✅ DONE - {total} FILES")
+    print(f"✅ DONE - {total} FILES TRANSLATED")
 
 
 if __name__ == "__main__":
